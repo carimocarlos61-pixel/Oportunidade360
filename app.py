@@ -26,7 +26,7 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS tasks (
           id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT NOT NULL,
-          category TEXT NOT NULL DEFAULT 'Microtarefas', reward REAL NOT NULL DEFAULT 0,
+          category TEXT NOT NULL DEFAULT 'Microtarefas', reward REAL NOT NULL DEFAULT 0, points_reward INTEGER NOT NULL DEFAULT 0,
           source TEXT NOT NULL DEFAULT 'own', external_url TEXT DEFAULT '',
           status TEXT NOT NULL DEFAULT 'pending', budget_available REAL NOT NULL DEFAULT 0,
           created_at TEXT NOT NULL
@@ -34,8 +34,18 @@ def init_db():
         CREATE TABLE IF NOT EXISTS submissions (
           id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
           proof TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', reward REAL NOT NULL DEFAULT 0,
-          created_at TEXT NOT NULL, reviewed_at TEXT DEFAULT '',
+          created_at TEXT NOT NULL, reviewed_at TEXT DEFAULT '', points_awarded INTEGER NOT NULL DEFAULT 0,
           UNIQUE(task_id, user_id), FOREIGN KEY(task_id) REFERENCES tasks(id),
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+        CREATE TABLE IF NOT EXISTS points_wallet (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, points INTEGER NOT NULL,
+          description TEXT NOT NULL, created_at TEXT NOT NULL,
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+        CREATE TABLE IF NOT EXISTS point_redemptions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, points INTEGER NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL,
           FOREIGN KEY(user_id) REFERENCES users(id)
         );
         CREATE TABLE IF NOT EXISTS wallet (
@@ -64,16 +74,44 @@ def init_db():
         user_cols=[r["name"] for r in con.execute("PRAGMA table_info(users)").fetchall()]
         if "account_type" not in user_cols:
             con.execute("ALTER TABLE users ADD COLUMN account_type TEXT NOT NULL DEFAULT 'participant'")
+        task_cols=[r["name"] for r in con.execute("PRAGMA table_info(tasks)").fetchall()]
+        if "points_reward" not in task_cols:
+            con.execute("ALTER TABLE tasks ADD COLUMN points_reward INTEGER NOT NULL DEFAULT 0")
+        sub_cols=[r["name"] for r in con.execute("PRAGMA table_info(submissions)").fetchall()]
+        if "points_awarded" not in sub_cols:
+            con.execute("ALTER TABLE submissions ADD COLUMN points_awarded INTEGER NOT NULL DEFAULT 0")
         # Optional admin bootstrap. Set ADMIN_EMAIL and ADMIN_PASSWORD in environment.
         admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
         admin_password = os.environ.get("ADMIN_PASSWORD", "")
         if admin_email and admin_password and not con.execute("SELECT id FROM users WHERE role='admin'").fetchone():
             con.execute("INSERT OR IGNORE INTO users(name,email,password_hash,role,created_at) VALUES(?,?,?,?,?)",
                         ("Administrador", admin_email, generate_password_hash(admin_password), "admin", now()))
-        if not con.execute("SELECT id FROM tasks LIMIT 1").fetchone():
-            con.execute("""INSERT INTO tasks(title,description,category,reward,source,status,budget_available,created_at)
-                VALUES(?,?,?,?,?,?,?,?)""",
-                ("Conhecer a plataforma", "Leia as páginas principais do Oportunidade360 e envie uma opinião curta sobre uma melhoria útil.", "Questionário", 0, "own", "active", 0, now()))
+        starter_tasks = [
+          ("Melhorias para a plataforma","Que funcionalidade tornaria o Oportunidade360 mais útil? Explica a tua ideia.","Ideias",10),
+          ("Hábitos digitais","Que tipos de aplicações úteis utilizas no dia a dia? Não partilhes dados privados.","Pesquisa",8),
+          ("Testar a página inicial","Visita a página inicial e descreve um ponto positivo e uma melhoria.","Testes",12),
+          ("Nova categoria de tarefas","Sugere uma categoria útil para estudantes ou pequenos negócios.","Ideias",8),
+          ("Mensagem de apresentação","Escreve uma frase simples que explique a plataforma a alguém novo.","Conteúdo",10),
+          ("Negócios locais","Que tipo de pequeno negócio beneficiaria de divulgação online?","Pesquisa",12),
+          ("Experiência no telemóvel","Testa a navegação móvel e indica se os menus são fáceis de usar.","Testes",15),
+          ("Ideia de campanha positiva","Propõe uma campanha educativa ou comunitária para a plataforma.","Criatividade",15),
+          ("Acessibilidade","Sugere uma forma de tornar os textos e botões mais fáceis de utilizar.","Qualidade",12),
+          ("Interesses de formação","Que competência digital gostarias de aprender?","Pesquisa",8),
+          ("Partilha voluntária","Partilha o link da plataforma com alguém interessado, sem spam, e conta onde partilhaste.","Divulgação",10),
+          ("Apresentar a um negócio","Com autorização, pergunta a um negócio local se gostaria de conhecer a área de anúncios.","Divulgação",15),
+          ("Rever instruções","Lê uma tarefa e indica se as instruções estão claras e completas.","Testes",8),
+          ("Pergunta de questionário","Cria uma pergunta neutra para um questionário de opinião.","Pesquisa",8),
+          ("Ideia para criadores","Sugere um tema de conteúdo útil que um criador local poderia produzir.","Criatividade",12),
+          ("Revisão de termos","Lê os termos e indica uma frase que deveria ser explicada de forma mais simples.","Qualidade",12),
+          ("Publicidade responsável","Como deve uma plataforma identificar claramente um conteúdo patrocinado?","Pesquisa",10),
+          ("Dica de segurança digital","Escreve uma dica curta para proteger contas online.","Conteúdo",10),
+          ("Ideia de parceria","Sugere uma associação ou projeto comunitário que poderia beneficiar de divulgação.","Parcerias",15),
+          ("Feedback geral","O que gostaste, o que não percebeste e o que melhorarias primeiro?","Feedback",15)
+        ]
+        for title,description,category,points in starter_tasks:
+            if not con.execute("SELECT id FROM tasks WHERE title=?",(title,)).fetchone():
+                con.execute("""INSERT INTO tasks(title,description,category,reward,points_reward,source,status,budget_available,created_at)
+                    VALUES(?,?,?,0,?,'own','active',0,?)""",(title,description,category,points,now()))
 
 def now():
     return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
@@ -304,7 +342,7 @@ def create_task():
 def review_submission(sid,action):
     if action not in ("approve","reject"): abort(404)
     with db() as con:
-        sub=con.execute("""SELECT s.*,t.reward,t.budget_available,t.title FROM submissions s
+        sub=con.execute("""SELECT s.*,t.reward,t.points_reward,t.budget_available,t.title FROM submissions s
             JOIN tasks t ON t.id=s.task_id WHERE s.id=?""",(sid,)).fetchone()
         if not sub or sub["status"]!="pending":
             flash("Submissão não encontrada ou já analisada.", "warning")
@@ -319,7 +357,12 @@ def review_submission(sid,action):
                     con.execute("UPDATE tasks SET budget_available=budget_available-? WHERE id=?",(reward,sub["task_id"]))
                     con.execute("INSERT INTO wallet(user_id,amount,kind,description,created_at) VALUES(?,?,?,?,?)",
                                 (sub["user_id"],reward,"credit","Recompensa: "+sub["title"],now()))
-                flash("Submissão aprovada.", "success")
+                points=int(sub["points_reward"] or 0)
+                if points>0:
+                    con.execute("INSERT INTO points_wallet(user_id,points,description,created_at) VALUES(?,?,?,?)",
+                                (sub["user_id"],points,"Tarefa aprovada: "+sub["title"],now()))
+                    con.execute("UPDATE submissions SET points_awarded=? WHERE id=?",(points,sid))
+                flash("Submissão aprovada. Os pontos foram adicionados à carteira.", "success")
         else:
             con.execute("UPDATE submissions SET status='rejected',reviewed_at=? WHERE id=?",(now(),sid))
             flash("Submissão rejeitada.", "success")
