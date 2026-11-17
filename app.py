@@ -332,16 +332,18 @@ def admin():
           "tasks":con.execute("SELECT COUNT(*) FROM tasks").fetchone()[0],
           "submissions":con.execute("SELECT COUNT(*) FROM submissions WHERE status='pending'").fetchone()[0],
           "campaigns":con.execute("SELECT COUNT(*) FROM campaign_requests WHERE status='new'").fetchone()[0],
-          "withdrawals":con.execute("SELECT COUNT(*) FROM withdrawals WHERE status='pending'").fetchone()[0]
+          "withdrawals":con.execute("SELECT COUNT(*) FROM withdrawals WHERE status='pending'").fetchone()[0],
+          "point_requests":con.execute("SELECT COUNT(*) FROM point_redemptions WHERE status='pending'").fetchone()[0]
         }
         submissions=con.execute("""SELECT s.*,u.name,u.email,t.title,t.reward,t.budget_available
             FROM submissions s JOIN users u ON u.id=s.user_id JOIN tasks t ON t.id=s.task_id
             ORDER BY s.id DESC LIMIT 30""").fetchall()
         campaigns=con.execute("SELECT * FROM campaign_requests ORDER BY id DESC LIMIT 20").fetchall()
         withdrawals=con.execute("SELECT w.*,u.name,u.email FROM withdrawals w JOIN users u ON u.id=w.user_id ORDER BY w.id DESC LIMIT 20").fetchall()
+        point_requests=con.execute("SELECT r.*,u.name,u.email FROM point_redemptions r JOIN users u ON u.id=r.user_id ORDER BY r.id DESC LIMIT 30").fetchall()
         tasks=con.execute("SELECT * FROM tasks ORDER BY id DESC").fetchall()
         partners=con.execute("SELECT * FROM partners ORDER BY id DESC").fetchall()
-    return render_template("admin.html",counts=counts,submissions=submissions,campaigns=campaigns,withdrawals=withdrawals,tasks=tasks,partners=partners)
+    return render_template("admin.html",counts=counts,submissions=submissions,campaigns=campaigns,withdrawals=withdrawals,point_requests=point_requests,tasks=tasks,partners=partners)
 
 @app.post("/admin/tarefa/criar")
 @login_required
@@ -350,6 +352,8 @@ def create_task():
     title=request.form.get("title","").strip(); desc=request.form.get("description","").strip()
     category=request.form.get("category","Microtarefas").strip()
     source=request.form.get("source","own")
+    try: points_reward=max(0,int(request.form.get("points_reward","0") or 0))
+    except ValueError: points_reward=0
     try: reward=max(0,float(request.form.get("reward","0") or 0))
     except ValueError: reward=0
     try: budget=max(0,float(request.form.get("budget","0") or 0))
@@ -358,8 +362,8 @@ def create_task():
         flash("Título e descrição são obrigatórios.", "danger")
     else:
         with db() as con:
-            con.execute("INSERT INTO tasks(title,description,category,reward,source,status,budget_available,created_at) VALUES(?,?,?,?,?,'active',?,?)",
-                        (title,desc,category,reward,source,budget,now()))
+            con.execute("INSERT INTO tasks(title,description,category,reward,points_reward,source,status,budget_available,created_at) VALUES(?,?,?, ?,?,?, 'active',?,?)",
+                        (title,desc,category,reward,points_reward,source,budget,now()))
         flash("Tarefa criada.", "success")
     return redirect(url_for("admin"))
 
@@ -393,6 +397,20 @@ def review_submission(sid,action):
         else:
             con.execute("UPDATE submissions SET status='rejected',reviewed_at=? WHERE id=?",(now(),sid))
             flash("Submissão rejeitada.", "success")
+    return redirect(url_for("admin"))
+
+@app.post("/admin/pontos/<int:rid>/<action>")
+@login_required
+@admin_required
+def review_point_request(rid,action):
+    if action not in ("reviewed","reject"): abort(404)
+    with db() as con:
+        item=con.execute("SELECT * FROM point_redemptions WHERE id=?",(rid,)).fetchone()
+        if not item or item["status"]!="pending":
+            flash("Pedido não encontrado ou já analisado.","warning")
+        else:
+            con.execute("UPDATE point_redemptions SET status=? WHERE id=?",("reviewed" if action=="reviewed" else "rejected",rid))
+            flash("Pedido analisado. Isto não confirma qualquer transferência de dinheiro.","success")
     return redirect(url_for("admin"))
 
 @app.post("/admin/levantamento/<int:wid>/<action>")
