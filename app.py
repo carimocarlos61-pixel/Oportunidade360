@@ -219,9 +219,10 @@ def dashboard():
             FROM tasks t LEFT JOIN submissions s ON s.task_id=t.id AND s.user_id=?
             WHERE t.status='active' ORDER BY t.id DESC""",(user["id"],)).fetchall()
         balance=con.execute("SELECT COALESCE(SUM(amount),0) AS total FROM wallet WHERE user_id=?",(user["id"],)).fetchone()["total"]
+        points=con.execute("SELECT COALESCE(SUM(points),0) FROM points_wallet WHERE user_id=?",(user["id"],)).fetchone()[0]
         history=con.execute("SELECT * FROM wallet WHERE user_id=? ORDER BY id DESC LIMIT 8",(user["id"],)).fetchall()
         withdrawals=con.execute("SELECT * FROM withdrawals WHERE user_id=? ORDER BY id DESC LIMIT 5",(user["id"],)).fetchall()
-    return render_template("dashboard.html",tasks=tasks,balance=balance,history=history,withdrawals=withdrawals)
+    return render_template("dashboard.html",tasks=tasks,balance=balance,points=points,history=history,withdrawals=withdrawals)
 
 @app.post("/tarefa/<int:task_id>/enviar")
 @login_required
@@ -263,6 +264,32 @@ def withdrawal():
                         (get_user()["id"],amount,method,phone,now()))
             flash("Pedido registado. Ainda não é um pagamento efetuado; será analisado pelo administrador.", "success")
     return redirect(url_for("dashboard"))
+
+@app.route("/carteira")
+@login_required
+def wallet_page():
+    uid=get_user()["id"]
+    with db() as con:
+        points=con.execute("SELECT COALESCE(SUM(points),0) FROM points_wallet WHERE user_id=?",(uid,)).fetchone()[0]
+        movements=con.execute("SELECT * FROM points_wallet WHERE user_id=? ORDER BY id DESC LIMIT 30",(uid,)).fetchall()
+        requests=con.execute("SELECT * FROM point_redemptions WHERE user_id=? ORDER BY id DESC LIMIT 20",(uid,)).fetchall()
+    return render_template("wallet.html",points=points,movements=movements,requests=requests)
+
+@app.post("/carteira/levantamento")
+@login_required
+def point_redemption():
+    try: points=int(request.form.get("points","0"))
+    except ValueError: points=0
+    uid=get_user()["id"]
+    with db() as con:
+        balance=con.execute("SELECT COALESCE(SUM(points),0) FROM points_wallet WHERE user_id=?",(uid,)).fetchone()[0]
+        pending=con.execute("SELECT COALESCE(SUM(points),0) FROM point_redemptions WHERE user_id=? AND status='pending'",(uid,)).fetchone()[0]
+        if points<100 or points>balance-pending:
+            flash("O pedido deve ter pelo menos 100 pontos e não pode ultrapassar o saldo disponível.","warning")
+        else:
+            con.execute("INSERT INTO point_redemptions(user_id,points,created_at) VALUES(?,?,?)",(uid,points,now()))
+            flash("Pedido registado para análise. Pontos não são dinheiro e não têm conversão garantida; qualquer recompensa depende de campanha financiada e das regras confirmadas pela equipa.","success")
+    return redirect(url_for("wallet_page"))
 
 @app.route("/empresas", methods=["GET","POST"])
 def companies():
