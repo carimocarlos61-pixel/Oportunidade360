@@ -29,7 +29,8 @@ def init_db():
           category TEXT NOT NULL DEFAULT 'Microtarefas', reward REAL NOT NULL DEFAULT 0, points_reward INTEGER NOT NULL DEFAULT 0,
           source TEXT NOT NULL DEFAULT 'own', external_url TEXT DEFAULT '',
           status TEXT NOT NULL DEFAULT 'pending', budget_available REAL NOT NULL DEFAULT 0,
-          created_at TEXT NOT NULL
+          created_at TEXT NOT NULL, task_type TEXT NOT NULL DEFAULT 'test', external_url TEXT DEFAULT '',
+          quiz_question TEXT DEFAULT '', quiz_options TEXT DEFAULT '', quiz_answer TEXT DEFAULT ''
         );
         CREATE TABLE IF NOT EXISTS submissions (
           id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
@@ -77,6 +78,9 @@ def init_db():
         task_cols=[r["name"] for r in con.execute("PRAGMA table_info(tasks)").fetchall()]
         if "points_reward" not in task_cols:
             con.execute("ALTER TABLE tasks ADD COLUMN points_reward INTEGER NOT NULL DEFAULT 0")
+        for col,definition in [("task_type","TEXT NOT NULL DEFAULT 'test'"),("external_url","TEXT DEFAULT ''"),("quiz_question","TEXT DEFAULT ''"),("quiz_options","TEXT DEFAULT ''"),("quiz_answer","TEXT DEFAULT ''")]:
+            if col not in task_cols:
+                con.execute(f"ALTER TABLE tasks ADD COLUMN {col} {definition}")
         sub_cols=[r["name"] for r in con.execute("PRAGMA table_info(submissions)").fetchall()]
         if "points_awarded" not in sub_cols:
             con.execute("ALTER TABLE submissions ADD COLUMN points_awarded INTEGER NOT NULL DEFAULT 0")
@@ -86,32 +90,36 @@ def init_db():
         if admin_email and admin_password and not con.execute("SELECT id FROM users WHERE role='admin'").fetchone():
             con.execute("INSERT OR IGNORE INTO users(name,email,password_hash,role,created_at) VALUES(?,?,?,?,?)",
                         ("Administrador", admin_email, generate_password_hash(admin_password), "admin", now()))
+        # New practical tasks: quizzes, short videos, sharing and usability tests.
+        old_titles = ('Melhorias para a plataforma','Hábitos digitais','Testar a página inicial','Nova categoria de tarefas','Mensagem de apresentação','Negócios locais','Experiência no telemóvel','Ideia de campanha positiva','Acessibilidade','Interesses de formação','Partilha voluntária','Apresentar a um negócio','Rever instruções','Pergunta de questionário','Ideia para criadores','Revisão de termos','Publicidade responsável','Dica de segurança digital','Ideia de parceria','Feedback geral')
+        con.execute("UPDATE tasks SET status='paused' WHERE title IN (" + ",".join("?" for _ in old_titles) + ")", old_titles)
         starter_tasks = [
-          ("Melhorias para a plataforma","Que funcionalidade tornaria o Oportunidade360 mais útil? Explica a tua ideia.","Ideias",10),
-          ("Hábitos digitais","Que tipos de aplicações úteis utilizas no dia a dia? Não partilhes dados privados.","Pesquisa",8),
-          ("Testar a página inicial","Visita a página inicial e descreve um ponto positivo e uma melhoria.","Testes",12),
-          ("Nova categoria de tarefas","Sugere uma categoria útil para estudantes ou pequenos negócios.","Ideias",8),
-          ("Mensagem de apresentação","Escreve uma frase simples que explique a plataforma a alguém novo.","Conteúdo",10),
-          ("Negócios locais","Que tipo de pequeno negócio beneficiaria de divulgação online?","Pesquisa",12),
-          ("Experiência no telemóvel","Testa a navegação móvel e indica se os menus são fáceis de usar.","Testes",15),
-          ("Ideia de campanha positiva","Propõe uma campanha educativa ou comunitária para a plataforma.","Criatividade",15),
-          ("Acessibilidade","Sugere uma forma de tornar os textos e botões mais fáceis de utilizar.","Qualidade",12),
-          ("Interesses de formação","Que competência digital gostarias de aprender?","Pesquisa",8),
-          ("Partilha voluntária","Partilha o link da plataforma com alguém interessado, sem spam, e conta onde partilhaste.","Divulgação",10),
-          ("Apresentar a um negócio","Com autorização, pergunta a um negócio local se gostaria de conhecer a área de anúncios.","Divulgação",15),
-          ("Rever instruções","Lê uma tarefa e indica se as instruções estão claras e completas.","Testes",8),
-          ("Pergunta de questionário","Cria uma pergunta neutra para um questionário de opinião.","Pesquisa",8),
-          ("Ideia para criadores","Sugere um tema de conteúdo útil que um criador local poderia produzir.","Criatividade",12),
-          ("Revisão de termos","Lê os termos e indica uma frase que deveria ser explicada de forma mais simples.","Qualidade",12),
-          ("Publicidade responsável","Como deve uma plataforma identificar claramente um conteúdo patrocinado?","Pesquisa",10),
-          ("Dica de segurança digital","Escreve uma dica curta para proteger contas online.","Conteúdo",10),
-          ("Ideia de parceria","Sugere uma associação ou projeto comunitário que poderia beneficiar de divulgação.","Parcerias",15),
-          ("Feedback geral","O que gostaste, o que não percebeste e o que melhorarias primeiro?","Feedback",15)
+          ("01 · Divulga no WhatsApp","Partilha o link da Oportunidade360 com pessoas e grupos que possam ter interesse. A meta sugerida é chegar a 10 contactos e 10 grupos relevantes, sem spam e respeitando as regras de cada grupo.","Divulgação",10,"share","","","",""),
+          ("02 · Apresenta no Facebook","Partilha a página numa publicação tua, se quiseres, e explica honestamente para que serve.","Divulgação",10,"share","","","",""),
+          ("03 · Partilha no Instagram","Partilha o link na tua bio ou story, se te sentires confortável. Não mostres dados pessoais.","Divulgação",10,"share","","","",""),
+          ("04 · Quiz: segurança da conta","Escolhe a opção mais segura para proteger a tua conta.","Quiz de segurança",12,"quiz","","Qual é a melhor forma de proteger uma conta?","Usar uma palavra-passe forte e única|Partilhar a palavra-passe com amigos|Usar a mesma palavra-passe em todos os sites","Usar uma palavra-passe forte e única"),
+          ("05 · Quiz: links suspeitos","Identifica a atitude mais segura perante um link desconhecido.","Quiz de segurança",12,"quiz","","Recebeste um link estranho a prometer prémios. O que deves fazer?","Abrir imediatamente|Verificar a origem e não fornecer dados|Enviar a palavra-passe para confirmar","Verificar a origem e não fornecer dados"),
+          ("06 · Quiz: privacidade","Aprende a proteger os teus dados pessoais.","Quiz de segurança",12,"quiz","","Que informação nunca deves publicar numa tarefa pública?","A tua palavra-passe ou códigos de acesso|A tua opinião sobre o site|Uma sugestão de melhoria","A tua palavra-passe ou códigos de acesso"),
+          ("07 · Quiz: melhorias","Ajuda-nos a escolher a próxima melhoria.","Quiz de produto",10,"quiz","","Qual melhoria seria mais útil?","Pesquisa e filtros de tarefas|Mais mensagens repetidas|Esconder as regras","Pesquisa e filtros de tarefas"),
+          ("08 · Quiz: navegação","Testa o teu conhecimento sobre a plataforma.","Quiz de produto",10,"quiz","","Onde consultas os pontos atribuídos após aprovação?","Na carteira|Na página de anúncios|No formulário de registo","Na carteira"),
+          ("09 · Quiz: anúncios","Aprende a reconhecer publicidade transparente.","Quiz de literacia digital",10,"quiz","","Como deve aparecer uma publicação paga por uma marca?","Identificada como publicidade ou patrocínio|Como opinião espontânea|Sem indicar a marca","Identificada como publicidade ou patrocínio"),
+          ("10 · Quiz: campanhas","Ajuda a perceber que campanhas são úteis.","Quiz de preferências",10,"quiz","","Que campanha tende a ser mais útil?","Informação clara e útil|Promessas de ganhos garantidos|Mensagem sem identificação","Informação clara e útil"),
+          ("11 · Quiz: regras","Conhece as regras básicas de participação.","Quiz de regras",10,"quiz","","Quando marcas uma tarefa como concluída?","Depois de cumprir as instruções|Antes de começar|Sem abrir a tarefa","Depois de cumprir as instruções"),
+          ("12 · Quiz: dados familiares","Aprende a proteger a privacidade da tua família.","Quiz de privacidade",12,"quiz","","Um questionário pede detalhes familiares desnecessários. O que fazer?","Não fornecer dados sensíveis e comunicar|Inventar dados|Publicar os dados da família","Não fornecer dados sensíveis e comunicar"),
+          ("13 · Quiz: idade","Aprende porque a recolha de idade deve ser limitada.","Quiz de privacidade",10,"quiz","","Se a idade não for necessária, o que deve a plataforma fazer?","Não pedir essa informação|Pedir a data de nascimento completa|Mostrar a idade publicamente","Não pedir essa informação"),
+          ("14 · Quiz: motivação","Ajuda-nos a perceber o que torna a plataforma útil.","Quiz de preferências",10,"quiz","","Qual é uma razão saudável para participar?","Aprender e experimentar tarefas úteis|Partilhar dados privados|Acreditar em dinheiro garantido","Aprender e experimentar tarefas úteis"),
+          ("15 · Vídeo rápido: plataforma","Assiste a um vídeo de apresentação de 10 a 30 segundos quando disponível e responde ao quiz.","Vídeo curto",12,"video","https://oportunidade360.onrender.com/","Qual é o objetivo principal da plataforma?","Ligar participantes, criadores e anunciantes|Prometer dinheiro sem condições|Vender dados pessoais","Ligar participantes, criadores e anunciantes"),
+          ("16 · Vídeo rápido: segurança","Vê um vídeo curto sobre segurança digital e escolhe a resposta correta.","Vídeo curto",12,"video","https://www.youtube.com/results?search_query=seguranca+digital+basica+portugues","O que deves fazer antes de abrir um link?","Confirmar se a origem é confiável|Enviar os teus dados primeiro|Partilhar com todos","Confirmar se a origem é confiável"),
+          ("17 · Testa a página inicial","Abre a página inicial e escolhe como foi a experiência.","Teste de utilização",12,"test","","","",""),
+          ("18 · Testa a área de tarefas","Abre as tarefas e indica se as instruções são fáceis de perceber.","Teste de utilização",12,"test","","","",""),
+          ("19 · Testa a carteira","Consulta a carteira e confirma se está claro que pontos não são dinheiro garantido.","Teste de utilização",12,"test","","","",""),
+          ("20 · Testa a área de anunciante","Visita a área de empresas e indica se está claro como pedir uma campanha.","Teste de utilização",12,"test","","","","")
         ]
-        for title,description,category,points in starter_tasks:
+        for title,description,category,points,task_type,external_url,question,options,answer in starter_tasks:
             if not con.execute("SELECT id FROM tasks WHERE title=?",(title,)).fetchone():
-                con.execute("""INSERT INTO tasks(title,description,category,reward,points_reward,source,status,budget_available,created_at)
-                    VALUES(?,?,?,0,?,'own','active',0,?)""",(title,description,category,points,now()))
+                con.execute("""INSERT INTO tasks(title,description,category,reward,points_reward,source,status,budget_available,created_at,task_type,external_url,quiz_question,quiz_options,quiz_answer)
+                    VALUES(?,?,?,0,?,'own','active',0,?,?,?,?,?,?)""",
+                    (title,description,category,points,now(),task_type,external_url,question,options,answer))
 
 def now():
     return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
@@ -137,7 +145,7 @@ def get_user():
     uid = session.get("user_id")
     if not uid: return None
     with db() as con:
-        return con.execute("SELECT id,name,email,role,phone FROM users WHERE id=?", (uid,)).fetchone()
+        return con.execute("SELECT id,name,email,role,phone,account_type FROM users WHERE id=?", (uid,)).fetchone()
 
 def login_required(fn):
     @wraps(fn)
@@ -227,19 +235,25 @@ def dashboard():
 @app.post("/tarefa/<int:task_id>/enviar")
 @login_required
 def submit_task(task_id):
-    proof=request.form.get("proof","").strip()
-    if len(proof)<5:
-        flash("Explica brevemente como concluíste a tarefa.", "warning")
-        return redirect(url_for("dashboard"))
+    answer=request.form.get("answer","").strip()
+    confirmed=request.form.get("confirmed","")
+    feedback=request.form.get("feedback","").strip()
     with db() as con:
         task=con.execute("SELECT * FROM tasks WHERE id=? AND status='active'",(task_id,)).fetchone()
         if not task:
             flash("Esta tarefa já não está disponível.", "warning")
+        elif task["task_type"] in ("quiz","video") and (not answer or answer != task["quiz_answer"]):
+            flash("Resposta incorreta. Revê o conteúdo e tenta novamente.", "warning")
+        elif task["task_type"] == "share" and confirmed != "yes":
+            flash("Confirma que fizeste a partilha de forma voluntária e sem spam.", "warning")
+        elif task["task_type"] == "test" and feedback not in ("Funcionou bem","Funcionou parcialmente","Não funcionou"):
+            flash("Escolhe como foi o teste.", "warning")
         else:
+            proof = answer if task["task_type"] in ("quiz","video") else (feedback if task["task_type"]=="test" else "Partilha confirmada pelo utilizador")
             try:
                 con.execute("INSERT INTO submissions(task_id,user_id,proof,created_at) VALUES(?,?,?,?)",
                             (task_id,get_user()["id"],proof,now()))
-                flash("Tarefa enviada para análise. O saldo só será atribuído após validação e confirmação do orçamento.", "success")
+                flash("Atividade enviada para análise. Os pontos só serão atribuídos após validação.", "success")
             except sqlite3.IntegrityError:
                 flash("Já enviaste esta tarefa.", "warning")
     return redirect(url_for("dashboard"))
@@ -352,6 +366,12 @@ def create_task():
     title=request.form.get("title","").strip(); desc=request.form.get("description","").strip()
     category=request.form.get("category","Microtarefas").strip()
     source=request.form.get("source","own")
+    task_type=request.form.get("task_type","test")
+    external_url=request.form.get("external_url","").strip()
+    quiz_question=request.form.get("quiz_question","").strip()
+    quiz_options=request.form.get("quiz_options","").strip()
+    quiz_answer=request.form.get("quiz_answer","").strip()
+    if task_type not in ("quiz","video","share","test"): task_type="test"
     try: points_reward=max(0,int(request.form.get("points_reward","0") or 0))
     except ValueError: points_reward=0
     try: reward=max(0,float(request.form.get("reward","0") or 0))
@@ -362,8 +382,9 @@ def create_task():
         flash("Título e descrição são obrigatórios.", "danger")
     else:
         with db() as con:
-            con.execute("INSERT INTO tasks(title,description,category,reward,points_reward,source,status,budget_available,created_at) VALUES(?,?,?, ?,?,?, 'active',?,?)",
-                        (title,desc,category,reward,points_reward,source,budget,now()))
+            con.execute("""INSERT INTO tasks(title,description,category,reward,points_reward,source,status,budget_available,created_at,task_type,external_url,quiz_question,quiz_options,quiz_answer)
+                VALUES(?,?,?,?,?,?, 'active',?,?,?,?,?,?,?)""",
+                (title,desc,category,reward,points_reward,source,budget,now(),task_type,external_url,quiz_question,quiz_options,quiz_answer))
         flash("Tarefa criada.", "success")
     return redirect(url_for("admin"))
 
