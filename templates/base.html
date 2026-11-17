@@ -3,7 +3,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head><body>
 <header class="top"><a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">O</span> Oportunidade<span>360</span></a>
 <nav><a href="{{ url_for('index') }}">Início</a><a href="{{ url_for('companies') }}">Para empresas</a><a href="{{ url_for('partners_page') }}">Parceiros</a>
-{% if current_user %}<a href="{{ url_for('dashboard') }}">Meu painel</a>{% if current_user.role=='admin' %}<a href="{{ url_for('admin') }}">Admin</a>{% endif %}
+{% if current_user %}<a href="{{ url_for('dashboard') }}">Meu painel</a><a href="{{ url_for('wallet_page') }}">Carteira</a>{% if current_user.role=='admin' %}<a href="{{ url_for('admin') }}">Admin</a>{% endif %}
 <form class="inline" method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="nav-button">Sair</button></form>
 {% else %}<a href="{{ url_for('login') }}">Entrar</a><a class="nav-cta" href="{{ url_for('register') }}">Criar conta</a>{% endif %}</nav></header>
 <main class="container">
