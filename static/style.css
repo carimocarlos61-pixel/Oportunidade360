@@ -18,3 +18,9 @@ body{background:linear-gradient(180deg,#f8fbfb 0%,#f2f7f6 100%)}
 .btn:active{transform:translateY(1px)}
 input:focus,textarea:focus,select:focus{outline:3px solid #0ba69a24;border-color:var(--teal)}
 @media(max-width:800px){.top{position:static}.hero{padding-top:34px}.container{padding-left:18px;padding-right:18px}}
+
+/* Task formats and role dashboard */
+.check-line{display:flex;align-items:flex-start;gap:10px;font-weight:500;color:var(--muted)}
+.check-line input{width:18px;margin-top:3px}
+.task-card form{display:grid;gap:12px;margin-top:12px}
+.task-card select{min-height:44px}
