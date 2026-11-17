@@ -6,7 +6,7 @@
   <div class="quiz-heading">
     <span class="eyebrow">QUIZ INTERACTIVO</span>
     <h1>{{ task.title }}</h1>
-    <p>{{ task.description }}</p>
+    <p>{{ task.description }}</p>{% if task.task_type == "video" and task.external_url %}<p><a class="btn ghost" href="{{ task.external_url }}" target="_blank" rel="noopener">Abrir vídeo / conteúdo</a></p>{% endif %}
     <div class="quiz-meta"><span>⏱ {{ task.quiz_duration }} minuto(s)</span><span>{{ questions|length }} perguntas</span><span>{{ task.points_reward }} pontos possíveis após validação</span></div>
   </div>
   <form method="post" action="{{ url_for('finish_quiz',task_id=task.id) }}" id="quiz-form">
