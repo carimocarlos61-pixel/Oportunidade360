@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}{{ 'Criar conta' if mode=='register' else 'Entrar' }} | Oportunidade360{% endblock %}{% block content %}
+<div class="auth-wrap"><div class="auth-card"><span class="eyebrow">OPORTUNIDADE360</span><h1>{{ 'Cria a tua conta' if mode=='register' else 'Bem-vindo de volta' }}</h1><p class="muted">{{ 'Regista-te gratuitamente para explorar atividades.' if mode=='register' else 'Entra para consultar as tuas atividades.' }}</p>
+<form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+{% if mode=='register' %}<label>Nome completo<input name="name" required minlength="2" autocomplete="name"></label>{% endif %}
+<label>Email<input type="email" name="email" required autocomplete="email"></label>
+{% if mode=='register' %}<label>Telefone (opcional)<input name="phone" autocomplete="tel" placeholder="+258..."></label>{% endif %}
+<label>Palavra-passe<input type="password" name="password" required minlength="8" autocomplete="{{ 'new-password' if mode=='register' else 'current-password' }}"></label>
+<button class="btn primary full">{{ 'Criar conta' if mode=='register' else 'Entrar' }}</button></form>
+<p class="switch-auth">{% if mode=='register' %}Já tens conta? <a href="{{ url_for('login') }}">Entrar</a>{% else %}Ainda não tens conta? <a href="{{ url_for('register') }}">Criar conta</a>{% endif %}</p></div></div>{% endblock %}

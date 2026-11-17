@@ -1,0 +1,3 @@
+{% extends "base.html" %}{% block title %}Parceiros | Oportunidade360{% endblock %}{% block content %}
+<div class="page-heading"><span class="eyebrow">REDE DE PARCEIROS</span><h1>Serviços e parceiros</h1><p class="muted">Links de parceiros identificados. Algumas ligações podem gerar comissão para a plataforma.</p></div>
+<div class="task-grid">{% for p in partners %}<article class="task-card"><span class="tag">Parceiro</span><h3>{{ p.name }}</h3><p>{{ p.description }}</p><small>{{ p.commission_note }}</small><a class="btn ghost full" href="{{ p.url }}" target="_blank" rel="noopener noreferrer sponsored">Visitar parceiro ↗</a></article>{% else %}<p class="muted">Ainda não existem parceiros publicados.</p>{% endfor %}</div>{% endblock %}

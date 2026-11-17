@@ -1,0 +1,14 @@
+<!doctype html><html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Oportunidade360{% endblock %}</title><meta name="description" content="Pesquisas, tarefas e oportunidades em Moçambique.">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head><body>
+<header class="top"><a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">O</span> Oportunidade<span>360</span></a>
+<nav><a href="{{ url_for('index') }}">Início</a><a href="{{ url_for('companies') }}">Para empresas</a><a href="{{ url_for('partners_page') }}">Parceiros</a>
+{% if current_user %}<a href="{{ url_for('dashboard') }}">Meu painel</a>{% if current_user.role=='admin' %}<a href="{{ url_for('admin') }}">Admin</a>{% endif %}
+<form class="inline" method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="nav-button">Sair</button></form>
+{% else %}<a href="{{ url_for('login') }}">Entrar</a><a class="nav-cta" href="{{ url_for('register') }}">Criar conta</a>{% endif %}</nav></header>
+<main class="container">
+{% with messages=get_flashed_messages(with_categories=true) %}{% if messages %}<div class="flashes">{% for category,message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}
+{% block content %}{% endblock %}
+</main>
+<footer><div><b>Oportunidade360</b><p>Oportunidades, pesquisas e tarefas num só lugar.</p></div><div class="foot-links"><a href="{{ url_for('about') }}">Sobre</a><a href="{{ url_for('privacy') }}">Privacidade</a><a href="{{ url_for('terms') }}">Termos</a><a href="{{ url_for('companies') }}">Anuncie connosco</a></div><small>© {{ site_name }}. Plataforma independente.</small></footer>
+</body></html>
