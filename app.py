@@ -262,6 +262,57 @@ def dashboard():
         withdrawals=con.execute("SELECT * FROM withdrawals WHERE user_id=? ORDER BY id DESC LIMIT 5",(user["id"],)).fetchall()
     return render_template("dashboard.html",tasks=tasks,balance=balance,points=points,history=history,withdrawals=withdrawals)
 
+@app.route("/quiz/<int:task_id>", methods=["GET"])
+@login_required
+def quiz_page(task_id):
+    uid=get_user()["id"]
+    with db() as con:
+        task=con.execute("SELECT * FROM tasks WHERE id=? AND status='active' AND task_type IN ('quiz','video')",(task_id,)).fetchone()
+        if not task: abort(404)
+        done=con.execute("SELECT id FROM submissions WHERE task_id=? AND user_id=?",(task_id,uid)).fetchone()
+        if done:
+            flash("Já participaste neste quiz. Obrigado!", "success")
+            return redirect(url_for("dashboard"))
+        questions=con.execute("SELECT * FROM quiz_questions WHERE task_id=? ORDER BY sort_order,id",(task_id,)).fetchall()
+    if not questions: abort(404)
+    session["quiz_started_"+str(task_id)]=int(datetime.utcnow().timestamp())
+    return render_template("quiz.html",task=task,questions=questions)
+
+@app.post("/quiz/<int:task_id>/concluir")
+@login_required
+def finish_quiz(task_id):
+    uid=get_user()["id"]
+    started=session.get("quiz_started_"+str(task_id))
+    with db() as con:
+        task=con.execute("SELECT * FROM tasks WHERE id=? AND status='active' AND task_type IN ('quiz','video')",(task_id,)).fetchone()
+        if not task: abort(404)
+        if not started:
+            flash("Abre o quiz pelo botão Participar para começar.", "warning")
+            return redirect(url_for("dashboard"))
+        elapsed=max(0,int(datetime.utcnow().timestamp())-int(started))
+        if elapsed > int(task["quiz_duration"])*60+120:
+            flash("O tempo deste quiz terminou. Volta às actividades para tentar outro.", "warning")
+            return redirect(url_for("dashboard"))
+        questions=con.execute("SELECT * FROM quiz_questions WHERE task_id=? ORDER BY sort_order,id",(task_id,)).fetchall()
+        answers={}
+        score=0
+        for q in questions:
+            value=request.form.get("q_"+str(q["id"]),"").strip()
+            if not value:
+                flash("Responde a todas as perguntas antes de concluir.", "warning")
+                return redirect(url_for("quiz_page",task_id=task_id))
+            answers[str(q["id"])]=value
+            if q["question_kind"]=="choice" and q["correct_answer"] and value==q["correct_answer"]:
+                score+=1
+        proof=json.dumps({"answers":answers,"score":score,"total":len(questions),"duration_seconds":elapsed},ensure_ascii=False)
+        try:
+            con.execute("INSERT INTO submissions(task_id,user_id,proof,created_at) VALUES(?,?,?,?)",(task_id,uid,proof,now()))
+            flash("Quiz concluído! As respostas foram registadas para análise.", "success")
+        except sqlite3.IntegrityError:
+            flash("Já participaste neste quiz.", "warning")
+    session.pop("quiz_started_"+str(task_id),None)
+    return redirect(url_for("dashboard"))
+
 @app.post("/tarefa/<int:task_id>/enviar")
 @login_required
 def submit_task(task_id):
