@@ -225,7 +225,7 @@ def dashboard():
     with db() as con:
         tasks=con.execute("""SELECT t.*, s.id AS submission_id, s.status AS submission_status
             FROM tasks t LEFT JOIN submissions s ON s.task_id=t.id AND s.user_id=?
-            WHERE t.status='active' ORDER BY t.id DESC""",(user["id"],)).fetchall()
+            WHERE t.status='active' ORDER BY t.id ASC""",(user["id"],)).fetchall()
         balance=con.execute("SELECT COALESCE(SUM(amount),0) AS total FROM wallet WHERE user_id=?",(user["id"],)).fetchone()["total"]
         points=con.execute("SELECT COALESCE(SUM(points),0) FROM points_wallet WHERE user_id=?",(user["id"],)).fetchone()[0]
         history=con.execute("SELECT * FROM wallet WHERE user_id=? ORDER BY id DESC LIMIT 8",(user["id"],)).fetchall()
