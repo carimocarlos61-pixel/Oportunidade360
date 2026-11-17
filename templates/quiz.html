@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ task.title }} | Oportunidade360{% endblock %}
+{% block content %}
+<section class="quiz-shell">
+  <a class="muted" href="{{ url_for('dashboard') }}">← Voltar às actividades</a>
+  <div class="quiz-heading">
+    <span class="eyebrow">QUIZ INTERACTIVO</span>
+    <h1>{{ task.title }}</h1>
+    <p>{{ task.description }}</p>
+    <div class="quiz-meta"><span>⏱ {{ task.quiz_duration }} minuto(s)</span><span>{{ questions|length }} perguntas</span><span>{{ task.points_reward }} pontos possíveis após validação</span></div>
+  </div>
+  <form method="post" action="{{ url_for('finish_quiz',task_id=task.id) }}" id="quiz-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="quiz-progress"><div id="quiz-progress-fill"></div></div>
+    <p class="muted" id="quiz-progress-label">Pergunta 1 de {{ questions|length }}</p>
+    {% for q in questions %}
+    <section class="quiz-question" data-question="{{ loop.index0 }}" {% if not loop.first %}hidden{% endif %}>
+      <span class="tag">Pergunta {{ loop.index }} / {{ questions|length }}</span>
+      <h2>{{ q.question }}</h2>
+      <div class="quiz-options">
+      {% for option in q.options.split('|') %}
+        <label class="quiz-option"><input type="radio" name="q_{{ q.id }}" value="{{ option }}" required><span>{{ option }}</span></label>
+      {% endfor %}
+      </div>
+      <div class="quiz-controls">
+        {% if not loop.first %}<button type="button" class="btn ghost quiz-prev">Anterior</button>{% endif %}
+        {% if not loop.last %}<button type="button" class="btn primary quiz-next">Próxima pergunta</button>{% else %}<button type="submit" class="btn primary">Concluir quiz</button>{% endif %}
+      </div>
+    </section>
+    {% endfor %}
+  </form>
+  <p class="quiz-timer">Tempo decorrido: <strong id="quiz-clock">00:00</strong> · Tempo previsto: {{ task.quiz_duration }} min</p>
+</section>
+<script>
+(function(){
+ const sections=[...document.querySelectorAll('.quiz-question')];
+ const fill=document.getElementById('quiz-progress-fill');
+ const label=document.getElementById('quiz-progress-label');
+ const clock=document.getElementById('quiz-clock');
+ let current=0,seconds=0;
+ function show(i){current=i;sections.forEach((el,n)=>el.hidden=n!==i);fill.style.width=((i+1)/sections.length*100)+'%';label.textContent='Pergunta '+(i+1)+' de '+sections.length;}
+ document.querySelectorAll('.quiz-next').forEach(b=>b.addEventListener('click',()=>{if(sections[current].querySelector('input[type=radio]:checked'))show(Math.min(current+1,sections.length-1));else alert('Escolhe uma resposta para continuar.');}));
+ document.querySelectorAll('.quiz-prev').forEach(b=>b.addEventListener('click',()=>show(Math.max(0,current-1))));
+ setInterval(()=>{seconds++;clock.textContent=String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');},1000);
+ document.getElementById('quiz-form').addEventListener('submit',e=>{if(sections.some(s=>!s.querySelector('input[type=radio]:checked'))){e.preventDefault();alert('Responde a todas as perguntas antes de concluir.');}});
+ show(0);
+})();
+</script>
+{% endblock %}
