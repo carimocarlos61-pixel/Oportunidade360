@@ -29,7 +29,7 @@ def init_db():
           category TEXT NOT NULL DEFAULT 'Microtarefas', reward REAL NOT NULL DEFAULT 0, points_reward INTEGER NOT NULL DEFAULT 0,
           source TEXT NOT NULL DEFAULT 'own', external_url TEXT DEFAULT '',
           status TEXT NOT NULL DEFAULT 'pending', budget_available REAL NOT NULL DEFAULT 0,
-          created_at TEXT NOT NULL, task_type TEXT NOT NULL DEFAULT 'test', external_url TEXT DEFAULT '',
+          created_at TEXT NOT NULL, task_type TEXT NOT NULL DEFAULT 'test',
           quiz_question TEXT DEFAULT '', quiz_options TEXT DEFAULT '', quiz_answer TEXT DEFAULT ''
         );
         CREATE TABLE IF NOT EXISTS submissions (
