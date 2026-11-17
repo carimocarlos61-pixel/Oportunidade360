@@ -3,7 +3,7 @@
 <form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 {% if mode=='register' %}<label>Nome completo<input name="name" required minlength="2" autocomplete="name"></label>{% endif %}
 <label>Email<input type="email" name="email" required autocomplete="email"></label>
-{% if mode=='register' %}<label>Como pretendes usar a plataforma?<select name="account_type"><option value="participant">Quero realizar tarefas e acumular pontos</option><option value="advertiser">Quero divulgar anúncios ou campanhas</option><option value="influencer">Sou criador de conteúdo / influenciador</option></select></label><label>Telefone (opcional)<input name="phone" autocomplete="tel" placeholder="+258..."></label>{% endif %}
+{% if mode=='register' %}<label>Como pretendes usar a plataforma?<select name="account_type"><option value="participant">Participante / trabalhador — realizar tarefas e quizzes</option><option value="advertiser">Quero divulgar anúncios ou campanhas</option><option value="influencer">Influencer / criador — propor conteúdos e campanhas</option></select></label><label>Telefone (opcional)<input name="phone" autocomplete="tel" placeholder="+258..."></label>{% endif %}
 <label>Palavra-passe<input type="password" name="password" required minlength="8" autocomplete="{{ 'new-password' if mode=='register' else 'current-password' }}"></label>
 <button class="btn primary full">{{ 'Criar conta' if mode=='register' else 'Entrar' }}</button></form>
 <p class="switch-auth">{% if mode=='register' %}Já tens conta? <a href="{{ url_for('login') }}">Entrar</a>{% else %}Ainda não tens conta? <a href="{{ url_for('register') }}">Criar conta</a>{% endif %}</p></div></div>{% endblock %}
