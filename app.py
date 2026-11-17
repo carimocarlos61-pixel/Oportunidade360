@@ -313,6 +313,33 @@ def finish_quiz(task_id):
     session.pop("quiz_started_"+str(task_id),None)
     return redirect(url_for("dashboard"))
 
+@app.post("/partilhar/<int:task_id>/<platform>")
+@login_required
+def start_share_task(task_id, platform):
+    destinations = {
+        "whatsapp": "https://wa.me/?text=Ol%C3%A1%21%20Quero%20partilhar%20contigo%20a%20Oportunidade360%2C%20uma%20plataforma%20de%20actividades%20e%20oportunidades.%20Conhece%20aqui%3A%20https%3A%2F%2Foportunidade360.onrender.com",
+        "facebook": "https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Foportunidade360.onrender.com",
+        "instagram": "https://www.instagram.com/"
+    }
+    if platform not in destinations:
+        abort(404)
+    uid = get_user()["id"]
+    with db() as con:
+        task = con.execute("SELECT id FROM tasks WHERE id=? AND status='active' AND task_type='share'", (task_id,)).fetchone()
+        if not task:
+            abort(404)
+        existing = con.execute("SELECT id FROM submissions WHERE task_id=? AND user_id=?", (task_id, uid)).fetchone()
+        if not existing:
+            con.execute(
+                "INSERT INTO submissions(task_id,user_id,proof,created_at,status) VALUES(?,?,?,?, 'pending')",
+                (task_id, uid, "Partilha iniciada em " + platform + " — aguarda verificação", now())
+            )
+            flash("Partilha iniciada. A tarefa está agora Em análise e será verificada pela equipa.", "success")
+        else:
+            flash("Esta tarefa já está Em análise ou já foi analisada.", "info")
+    return redirect(destinations[platform])
+
+
 @app.post("/tarefa/<int:task_id>/enviar")
 @login_required
 def submit_task(task_id):
