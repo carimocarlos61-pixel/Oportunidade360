@@ -49,6 +49,11 @@ def init_db():
           description TEXT NOT NULL, created_at TEXT NOT NULL,
           FOREIGN KEY(user_id) REFERENCES users(id)
         );
+        CREATE TABLE IF NOT EXISTS metcash_wallet (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, amount INTEGER NOT NULL,
+          description TEXT NOT NULL, created_at TEXT NOT NULL,
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        );
         CREATE TABLE IF NOT EXISTS point_redemptions (
           id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, points INTEGER NOT NULL,
           status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL,
@@ -258,9 +263,10 @@ def dashboard():
             WHERE t.status='active' ORDER BY t.id ASC""",(user["id"],)).fetchall()
         balance=con.execute("SELECT COALESCE(SUM(amount),0) AS total FROM wallet WHERE user_id=?",(user["id"],)).fetchone()["total"]
         points=con.execute("SELECT COALESCE(SUM(points),0) FROM points_wallet WHERE user_id=?",(user["id"],)).fetchone()[0]
+        metcash=con.execute("SELECT COALESCE(SUM(amount),0) FROM metcash_wallet WHERE user_id=?",(user["id"],)).fetchone()[0]
         history=con.execute("SELECT * FROM wallet WHERE user_id=? ORDER BY id DESC LIMIT 8",(user["id"],)).fetchall()
         withdrawals=con.execute("SELECT * FROM withdrawals WHERE user_id=? ORDER BY id DESC LIMIT 5",(user["id"],)).fetchall()
-    return render_template("dashboard.html",tasks=tasks,balance=balance,points=points,history=history,withdrawals=withdrawals)
+    return render_template("dashboard.html",tasks=tasks,balance=balance,points=points,metcash=metcash,history=history,withdrawals=withdrawals)
 
 @app.route("/quiz/<int:task_id>", methods=["GET"])
 @login_required
@@ -393,9 +399,11 @@ def wallet_page():
     uid=get_user()["id"]
     with db() as con:
         points=con.execute("SELECT COALESCE(SUM(points),0) FROM points_wallet WHERE user_id=?",(uid,)).fetchone()[0]
+        metcash=con.execute("SELECT COALESCE(SUM(amount),0) FROM metcash_wallet WHERE user_id=?",(uid,)).fetchone()[0]
+        metcash_movements=con.execute("SELECT * FROM metcash_wallet WHERE user_id=? ORDER BY id DESC LIMIT 30",(uid,)).fetchall()
         movements=con.execute("SELECT * FROM points_wallet WHERE user_id=? ORDER BY id DESC LIMIT 30",(uid,)).fetchall()
         requests=con.execute("SELECT * FROM point_redemptions WHERE user_id=? ORDER BY id DESC LIMIT 20",(uid,)).fetchall()
-    return render_template("wallet.html",points=points,movements=movements,requests=requests)
+    return render_template("wallet.html",points=points,metcash=metcash,metcash_movements=metcash_movements,movements=movements,requests=requests)
 
 @app.post("/carteira/levantamento")
 @login_required
