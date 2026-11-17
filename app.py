@@ -22,7 +22,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
           id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL,
           password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'user',
-          phone TEXT DEFAULT '', created_at TEXT NOT NULL
+          phone TEXT DEFAULT '', account_type TEXT NOT NULL DEFAULT 'participant', created_at TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS tasks (
           id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT NOT NULL,
@@ -60,6 +60,10 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
         """)
+        # Upgrade existing databases without deleting accounts.
+        user_cols=[r["name"] for r in con.execute("PRAGMA table_info(users)").fetchall()]
+        if "account_type" not in user_cols:
+            con.execute("ALTER TABLE users ADD COLUMN account_type TEXT NOT NULL DEFAULT 'participant'")
         # Optional admin bootstrap. Set ADMIN_EMAIL and ADMIN_PASSWORD in environment.
         admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
         admin_password = os.environ.get("ADMIN_PASSWORD", "")
@@ -128,6 +132,8 @@ def register():
         email=request.form.get("email","").strip().lower()
         password=request.form.get("password","")
         phone=request.form.get("phone","").strip()
+        account_type=request.form.get("account_type","participant")
+        if account_type not in ("participant","advertiser","influencer"): account_type="participant"
         if len(name)<2 or "@" not in email or len(password)<8:
             flash("Preenche os dados corretamente. A palavra-passe deve ter pelo menos 8 caracteres.", "danger")
         else:
@@ -135,8 +141,8 @@ def register():
                 with db() as con:
                     admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
                     assigned_role = "admin" if admin_email and email == admin_email else "user"
-                    cur=con.execute("INSERT INTO users(name,email,password_hash,role,phone,created_at) VALUES(?,?,?,?,?,?)",
-                                    (name,email,generate_password_hash(password),assigned_role,phone,now()))
+                    cur=con.execute("INSERT INTO users(name,email,password_hash,role,phone,account_type,created_at) VALUES(?,?,?,?,?,?,?)",
+                                    (name,email,generate_password_hash(password),assigned_role,phone,account_type,now()))
                     session["user_id"]=cur.lastrowid
                 flash("Conta criada com sucesso!", "success")
                 return redirect(url_for("admin") if assigned_role == "admin" else url_for("dashboard"))
