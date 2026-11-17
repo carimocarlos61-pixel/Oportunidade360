@@ -1,4 +1,4 @@
-import os, sqlite3, secrets
+import os, sqlite3, secrets, json
 from functools import wraps
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, session, abort
@@ -30,7 +30,12 @@ def init_db():
           source TEXT NOT NULL DEFAULT 'own', external_url TEXT DEFAULT '',
           status TEXT NOT NULL DEFAULT 'pending', budget_available REAL NOT NULL DEFAULT 0,
           created_at TEXT NOT NULL, task_type TEXT NOT NULL DEFAULT 'test',
-          quiz_question TEXT DEFAULT '', quiz_options TEXT DEFAULT '', quiz_answer TEXT DEFAULT ''
+          quiz_question TEXT DEFAULT '', quiz_options TEXT DEFAULT '', quiz_answer TEXT DEFAULT '', quiz_duration INTEGER NOT NULL DEFAULT 5
+        );
+        CREATE TABLE IF NOT EXISTS quiz_questions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL, question TEXT NOT NULL,
+          options TEXT NOT NULL, correct_answer TEXT DEFAULT '', question_kind TEXT NOT NULL DEFAULT 'choice',
+          sort_order INTEGER NOT NULL DEFAULT 1, FOREIGN KEY(task_id) REFERENCES tasks(id)
         );
         CREATE TABLE IF NOT EXISTS submissions (
           id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
@@ -78,7 +83,7 @@ def init_db():
         task_cols=[r["name"] for r in con.execute("PRAGMA table_info(tasks)").fetchall()]
         if "points_reward" not in task_cols:
             con.execute("ALTER TABLE tasks ADD COLUMN points_reward INTEGER NOT NULL DEFAULT 0")
-        for col,definition in [("task_type","TEXT NOT NULL DEFAULT 'test'"),("external_url","TEXT DEFAULT ''"),("quiz_question","TEXT DEFAULT ''"),("quiz_options","TEXT DEFAULT ''"),("quiz_answer","TEXT DEFAULT ''")]:
+        for col,definition in [("task_type","TEXT NOT NULL DEFAULT 'test'"),("external_url","TEXT DEFAULT ''"),("quiz_question","TEXT DEFAULT ''"),("quiz_options","TEXT DEFAULT ''"),("quiz_answer","TEXT DEFAULT ''"),("quiz_duration","INTEGER NOT NULL DEFAULT 5")]:
             if col not in task_cols:
                 con.execute(f"ALTER TABLE tasks ADD COLUMN {col} {definition}")
         sub_cols=[r["name"] for r in con.execute("PRAGMA table_info(submissions)").fetchall()]
@@ -119,7 +124,32 @@ def init_db():
             if not con.execute("SELECT id FROM tasks WHERE title=?",(title,)).fetchone():
                 con.execute("""INSERT INTO tasks(title,description,category,reward,points_reward,source,status,budget_available,created_at,task_type,external_url,quiz_question,quiz_options,quiz_answer)
                     VALUES(?,?,?,0,?,'own','active',0,?,?,?,?,?,?)""",
-                    (title,description,category,points,now(),task_type,external_url,question,options,answer))
+                    (title,description,category,points,now(),task_type,external_url,question,options,answer)) 
+        quiz_bank = [
+          ("Que tipo de oportunidade procuras neste momento?","Emprego ou estágio|Aprender uma competência|Pequenos trabalhos|Conhecer campanhas","","personal"),
+          ("Que área gostarias de desenvolver?","Tecnologia|Comunicação|Negócios|Design e criatividade","","personal"),
+          ("Qual é a maior dificuldade para encontrares oportunidades?","Falta de informação|Falta de experiência|Falta de contactos|Falta de tempo","","personal"),
+          ("Como preferes aprender algo novo?","Vídeos curtos|Quizzes interactivos|Guias passo a passo|Praticar directamente","","personal"),
+          ("Que melhoria ajudaria mais na plataforma?","Pesquisa e filtros|Mais quizzes|Explicações em vídeo|Melhor experiência no telemóvel","","personal"),
+          ("Qual é a melhor forma de proteger a tua conta?","Usar palavra-passe forte e única|Partilhar a palavra-passe|Usar a mesma palavra-passe em todo lado","Usar palavra-passe forte e única","choice"),
+          ("Recebeste um link inesperado. O que deves fazer?","Verificar a origem antes de abrir|Enviar os teus dados|Partilhar imediatamente","Verificar a origem antes de abrir","choice"),
+          ("Que informação nunca deves partilhar publicamente?","Palavra-passe e códigos de acesso|Uma sugestão de melhoria|A tua opinião sobre o site","Palavra-passe e códigos de acesso","choice"),
+          ("O que deve acontecer quando um anúncio é patrocinado?","Ser identificado como publicidade|Parecer uma opinião espontânea|Esconder o patrocinador","Ser identificado como publicidade","choice"),
+          ("Quando deves concluir uma tarefa?","Depois de cumprir as instruções|Antes de começar|Sem a abrir","Depois de cumprir as instruções","choice"),
+          ("Que formato de tarefa preferes?","Quiz|Vídeo curto com perguntas|Teste de utilização|Partilha voluntária","","personal"),
+          ("O que te faria voltar à plataforma?","Novas actividades úteis|Mais explicações|Uma navegação simples|Campanhas interessantes","","personal"),
+          ("Quanto tempo preferes dedicar a uma actividade?","1 a 2 minutos|5 minutos|10 minutos|15 minutos","","personal"),
+          ("Em que dispositivo usas mais a internet?","Telemóvel|Computador|Tablet|Depende do dia","","personal"),
+          ("Que apoio seria mais útil para ti?","Aprender a criar CV|Aprender competências digitais|Encontrar oportunidades|Divulgar um pequeno negócio","","personal")
+        ]
+        durations = [1,2,5,10,15]
+        for task in con.execute("SELECT id,task_type,category FROM tasks WHERE status='active' AND task_type IN ('quiz','video')").fetchall():
+            if con.execute("SELECT COUNT(*) FROM quiz_questions WHERE task_id=?",(task["id"],)).fetchone()[0] == 0:
+                selected = quiz_bank[5:10] + quiz_bank[:5] if "segurança" in (task["category"] or "").lower() else quiz_bank[:10]
+                for idx,(question,options,correct,kind) in enumerate(selected,1):
+                    con.execute("INSERT INTO quiz_questions(task_id,question,options,correct_answer,question_kind,sort_order) VALUES(?,?,?,?,?,?)",(task["id"],question,options,correct,kind,idx))
+                con.execute("UPDATE tasks SET quiz_duration=? WHERE id=?",(durations[(task["id"]-1)%5],task["id"]))
+
 
 def now():
     return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
