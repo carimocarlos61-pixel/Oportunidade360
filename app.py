@@ -220,8 +220,9 @@ def register():
         else:
             try:
                 with db() as con:
-                    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
-                    assigned_role = "admin" if admin_email and email == admin_email else "user"
+                    # Public registration must never grant administrator privileges.
+                    # The administrator is provisioned only by the private ADMIN_EMAIL + ADMIN_PASSWORD environment settings.
+                    assigned_role = "user"
                     cur=con.execute("INSERT INTO users(name,email,password_hash,role,phone,account_type,created_at) VALUES(?,?,?,?,?,?,?)",
                                     (name,email,generate_password_hash(password),assigned_role,phone,account_type,now()))
                     session["user_id"]=cur.lastrowid
