@@ -133,8 +133,10 @@ def register():
         else:
             try:
                 with db() as con:
-                    cur=con.execute("INSERT INTO users(name,email,password_hash,phone,created_at) VALUES(?,?,?,?,?)",
-                                    (name,email,generate_password_hash(password),phone,now()))
+                    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
+                    assigned_role = "admin" if admin_email and email == admin_email else "user"
+                    cur=con.execute("INSERT INTO users(name,email,password_hash,role,phone,created_at) VALUES(?,?,?,?,?,?)",
+                                    (name,email,generate_password_hash(password),assigned_role,phone,now()))
                     session["user_id"]=cur.lastrowid
                 flash("Conta criada com sucesso!", "success")
                 return redirect(url_for("dashboard"))
