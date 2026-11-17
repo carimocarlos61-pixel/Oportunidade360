@@ -139,7 +139,7 @@ def register():
                                     (name,email,generate_password_hash(password),assigned_role,phone,now()))
                     session["user_id"]=cur.lastrowid
                 flash("Conta criada com sucesso!", "success")
-                return redirect(url_for("dashboard"))
+                return redirect(url_for("admin") if assigned_role == "admin" else url_for("dashboard"))
             except sqlite3.IntegrityError:
                 flash("Este email já está registado.", "warning")
     return render_template("auth.html", mode="register")
