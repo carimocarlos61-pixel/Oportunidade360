@@ -1,6 +1,7 @@
 <!doctype html><html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}Oportunidade360{% endblock %}</title><meta name="description" content="Pesquisas, tarefas e oportunidades em Moçambique.">
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head><body>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">  <meta name="monetag" content="056a68a7b9b8ad2c5aed09a038f8bfa7">
+</head><body>
 <header class="top"><a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">O</span> Oportunidade<span>360</span></a>
 <nav><a href="{{ url_for('index') }}">Início</a><a href="{{ url_for('companies') }}">Para empresas</a><a href="{{ url_for('partners_page') }}">Parceiros</a>
 {% if current_user %}<a href="{{ url_for('dashboard') }}">Meu painel</a><a href="{{ url_for('wallet_page') }}">Carteira</a>{% if current_user.role=='admin' %}<a href="{{ url_for('admin') }}">Admin</a>{% endif %}
